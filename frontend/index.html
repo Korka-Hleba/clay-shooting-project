@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализатор мишеней для стрельбы</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #fafafa;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .drop-zone {
+            border: 2px dashed #FFB6C1;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 20px;
+        }
+
+        .drop-zone:hover {
+            background: #FFF0F5;
+        }
+
+        .file-info {
+            margin: 20px 0;
+            padding: 10px;
+            background: #FFF0F5;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #FFB6C1;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #FFA7B3;
+        }
+
+        button:disabled {
+            background: #e0e0e0;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .message {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .success { background: #FFF0F5; color: #666; border: 1px solid #FFD1DC; }
+        .error { background: #FFF0F5; color: #666; border: 1px solid #FFD1DC; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th {
+            background: #FFE4E9;
+            color: #333;
+            padding: 12px;
+            text-align: left;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #FFF9FB;
+        }
+
+        .video-link {
+            color: #FF6B8B;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        #detectionImage {
+            max-width: 100%;
+            border: 2px solid #FFB6C1;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            flex: 1;
+            min-width: 200px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-top: 4px solid #FFB6C1;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FF6B8B;
+        }
+
+        .help-text {
+            font-size: 14px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .light-pink-text {
+            color: #FF6B8B;
+        }
+
+        .light-pink-bg {
+            background: #FFF0F5;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #FFB6C1;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Анализатор видео для стендовой стрельбы</h1>
+        <p class="light-pink-text">Загрузите видео для анализа мишеней</p>
+    </header>
+
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-value" id="totalVideos">0</div>
+            <div>Обработано видео</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="totalDetections">0</div>
+            <div>Найдено мишеней</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="brokenTargets">0</div>
+            <div>Разбитых мишеней</div>
+        </div>
+    </div>
+
+    <div class="upload-section">
+        <h2 class="light-pink-text">1. Загрузите видео</h2>
+        <p class="help-text">Поддерживаемые форматы: MP4, AVI, MOV, MKV</p>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="upload-icon">Загрузить</div>
+            <h3 class="light-pink-text">Перетащите видео сюда</h3>
+            <p>Или нажмите для выбора файла</p>
+            <input type="file" id="fileInput" accept="video/*" style="display: none;">
+        </div>
+
+        <div class="file-info" id="fileInfo">
+            <strong>Выбран файл:</strong> <span id="fileName"></span>
+            <div style="margin-top: 5px; font-size: 14px;" id="fileSize"></div>
+        </div>
+
+        <div class="controls">
+            <button onclick="analyzeVideo()" id="analyzeBtn" disabled>Начать анализ</button>
+            <button onclick="loadAllData()">Обновить данные</button>
+            <button onclick="exportExcel()" style="background: #FFD1DC;">Экспорт в Excel</button>
+            <button onclick="exportCSV()" style="background: #FFE4E1;">Экспорт в CSV</button>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="upload-icon">Обработка</div>
+        <p>Анализируем видео... Подождите пожалуйста</p>
+        <p style="font-size: 14px; color: #888; margin-top: 10px;">Обрабатывается каждый кадр с шагом 0.5 секунд</p>
+    </div>
+
+    <div class="message" id="message"></div>
+
+    <div style="margin-top: 40px;">
+        <h2 class="light-pink-text">2. Результаты анализа</h2>
+        <p class="help-text">Нажмите на название видео для просмотра кадра с мишенью</p>
+
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>Видео файл</th>
+                    <th>Время (сек)</th>
+                    <th>Состояние</th>
+                    <th>Координаты X</th>
+                    <th>Координаты Y</th>
+                    <th>Уверенность</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+            </tbody>
+        </table>
+
+        <div id="noData" style="text-align: center; padding: 40px; color: #888; display: none;">
+            <div class="upload-icon">Нет данных</div>
+            <p>Нет данных о разбитых мишенях</p>
+            <p>Загрузите видео для анализа</p>
+        </div>
+    </div>
+
+    <div class="modal" id="imageModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 style="color: #FF6B8B;" id="modalTitle">Кадр с мишенью</h3>
+            <div id="modalDetails"></div>
+            <img id="detectionImage" src="" alt="Кадр с мишенью">
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentFile = null;
+        let allDetections = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setupFileUpload();
+            loadAllData();
+        });
+
+        function setupFileUpload() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    selectFile(e.target.files[0]);
+                }
+            });
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.background = '#FFF0F5';
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.background = 'white';
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.background = 'white';
+
+                if (e.dataTransfer.files[0]) {
+                    selectFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        function selectFile(file) {
+            if (!file.type.startsWith('video/')) {
+                showMessage('Выберите видео файл', 'error');
+                return;
+            }
+
+            currentFile = file;
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent =
+                `Размер: ${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+            document.getElementById('fileInfo').style.display = 'block';
+
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+
+        async function analyzeVideo() {
+            if (!currentFile) {
+                showMessage('Сначала выберите видео файл', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', currentFile);
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('analyzeBtn').disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/analyze/`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Ошибка сервера');
+                }
+
+                const result = await response.json();
+
+                showMessage(
+                    `Анализ завершен! Найдено мишеней: ${result.total_detections}`,
+                    'success'
+                );
+
+                await loadAllData();
+
+                currentFile = null;
+                document.getElementById('fileInfo').style.display = 'none';
+                document.getElementById('fileInput').value = '';
+
+            } catch (error) {
+                showMessage(`Ошибка: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+
+        async function loadAllData() {
+            try {
+                const response = await fetch(`${API_URL}/detections/`);
+                allDetections = await response.json();
+
+                updateStatistics();
+                updateTable();
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+            }
+        }
+
+        function updateStatistics() {
+            const totalVideos = [...new Set(allDetections.map(d => d.video_file))].length;
+            const totalDetections = allDetections.length;
+            const brokenTargets = allDetections.filter(d =>
+                d.target_state === 'Мишень разбитая' || d.target_state === 'разбитая'
+            ).length;
+
+            document.getElementById('totalVideos').textContent = totalVideos;
+            document.getElementById('totalDetections').textContent = totalDetections;
+            document.getElementById('brokenTargets').textContent = brokenTargets;
+        }
+
+        function updateTable() {
+            const tableBody = document.getElementById('tableBody');
+            const noDataDiv = document.getElementById('noData');
+
+            const brokenDetections = allDetections.filter(d =>
+                d.target_state === 'Мишень разбитая' || d.target_state === 'разбитая'
+            );
+
+            if (brokenDetections.length === 0) {
+                tableBody.innerHTML = '';
+                noDataDiv.style.display = 'block';
+                return;
+            }
+
+            noDataDiv.style.display = 'none';
+
+            let html = '';
+            brokenDetections.forEach(detection => {
+                html += `
+                    <tr>
+                        <td>
+                            <span class="video-link" onclick="showDetectionImage(${detection.id})">
+                                ${detection.video_file}
+                            </span>
+                        </td>
+                        <td>${detection.timestamp || '0.0'}</td>
+                        <td>${detection.target_state}</td>
+                        <td>${detection.bbox?.x1?.toFixed(1) || '—'}</td>
+                        <td>${detection.bbox?.y1?.toFixed(1) || '—'}</td>
+                        <td>${detection.confidence ? (detection.confidence * 100).toFixed(1) + '%' : '—'}</td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+        }
+
+        async function showDetectionImage(detectionId) {
+            const detection = allDetections.find(d => d.id === detectionId);
+            if (!detection) return;
+
+            const modal = document.getElementById('imageModal');
+            const title = document.getElementById('modalTitle');
+            const details = document.getElementById('modalDetails');
+            const image = document.getElementById('detectionImage');
+
+            title.textContent = `Мишень в ${detection.timestamp} сек`;
+
+            details.innerHTML = `
+                <p><strong>Видео:</strong> ${detection.video_file}</p>
+                <p><strong>Состояние:</strong> ${detection.target_state}</p>
+                <p><strong>Координаты:</strong> X=${detection.bbox?.x1?.toFixed(1) || '—'}, Y=${detection.bbox?.y1?.toFixed(1) || '—'}</p>
+                <p><strong>Уверенность:</strong> ${detection.confidence ? (detection.confidence * 100).toFixed(1) + '%' : '—'}</p>
+            `;
+
+            image.src = `https://via.placeholder.com/800x450/FFB6C1/333333?text=Кадр+с+мишенью+в+${detection.timestamp}с`;
+
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        function exportExcel() {
+            window.open(`${API_URL}/export/excel/`, '_blank');
+        }
+
+        function exportCSV() {
+            window.open(`${API_URL}/export/csv/`, '_blank');
+        }
+
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('imageModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
